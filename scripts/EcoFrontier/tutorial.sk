@@ -1,0 +1,26 @@
+function ecf_start_tutorial(p: player):
+    set {_step} to {ecf::player::%uuid of {_p}%::tutorial-step}
+    if {_step} >= {@tutorial-steps}:
+        set {ecf::player::%uuid of {_p}%::tutorial-step} to 0
+    ecf_run_tutorial({_p})
+
+function ecf_run_tutorial(p: player):
+    set {_step} to {ecf::player::%uuid of {_p}%::tutorial-step}
+    if {_step} is 0:
+        send "&aTutorial 1/6: &fUse &a/frontier &fto open your colony menu." to {_p}
+    if {_step} is 1:
+        send "&aTutorial 2/6: &fPurchase a miner with &a/workstation miner&f to gather stone/metal." to {_p}
+    if {_step} is 2:
+        send "&aTutorial 3/6: &fFarmers supply food & wood. Keep your energy above zero!" to {_p}
+    if {_step} is 3:
+        send "&aTutorial 4/6: &fOpen the &aMarketplace&f to buy/sell resources. Prices shift daily." to {_p}
+    if {_step} is 4:
+        send "&aTutorial 5/6: &fUpgrade your colony in the Upgrade menu to unlock perks." to {_p}
+    if {_step} is 5:
+        send "&aTutorial 6/6: &fTrade with friends using &a/trade <player>&f to build alliances." to {_p}
+    add 1 to {ecf::player::%uuid of {_p}%::tutorial-step}
+
+on command:
+    if command is "frontier" or command is "workstation" or command is "market":
+        if {ecf::player::%uuid of player%::tutorial-step} < 6:
+            ecf_run_tutorial(player)

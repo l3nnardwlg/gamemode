@@ -1,0 +1,63 @@
+options:
+    upgrade-cost-0: 150
+    upgrade-cost-1: 250
+    upgrade-cost-2: 400
+    upgrade-cost-3: 600
+    upgrade-cost-4: 900
+    upgrade-cost-5: 1200
+    upgrade-cost-6: 1600
+    upgrade-cost-7: 2000
+    upgrade-cost-8: 2400
+    upgrade-cost-9: 3000
+    upgrade-cost-10: 3600
+
+function ecf_upgrade_cost(level: number) :: number:
+    if {@upgrade-cost-%{_level}%} is set:
+        return {@upgrade-cost-%{_level}%}
+    return 3600
+
+function ecf_can_upgrade(p: player) :: boolean:
+    set {_id} to uuid of {_p}
+    set {_level} to {ecf::player::%{_id}%::colony-level}
+    if {_level} >= 10:
+        return false
+    set {_cost} to ecf_upgrade_cost({_level})
+    return {ecf::player::%{_id}%::credits} >= {_cost}
+
+function ecf_upgrade_colony(p: player):
+    if not ecf_can_upgrade({_p}):
+        send "&cYou cannot upgrade right now." to {_p}
+        stop
+    set {_id} to uuid of {_p}
+    set {_level} to {ecf::player::%{_id}%::colony-level}
+    set {_cost} to ecf_upgrade_cost({_level})
+    remove {_cost} from {ecf::player::%{_id}%::credits}
+    add 1 to {ecf::player::%{_id}%::colony-level}
+    set {_new} to {ecf::player::%{_id}%::colony-level}
+    send "&aColony upgraded to level %{_new}%!" to {_p}
+    if {_new} is 2:
+        send "&eUnlocked Marketplace workstation efficiency bonuses." to {_p}
+    if {_new} is 4:
+        send "&eUnlocked Factory tier (engineer outputs +1 metal)." to {_p}
+    if {_new} is 6:
+        send "&eUnlocked Research Lab (energy cap +20)." to {_p}
+    if {_new} is 8:
+        send "&eUnlocked Energy Reactor (engineers cost -2 energy)." to {_p}
+    if {_new} is 10:
+        send "&eUnlocked Mega Farm (farmers +4 food)." to {_p}
+
+function ecf_upgrade_bonus(p: player, type: text) :: number:
+    set {_id} to uuid of {_p}
+    set {_level} to {ecf::player::%{_id}%::colony-level}
+    if {_type} is "engineer-metal" and {_level} >= 4:
+        return 1
+    if {_type} is "energy-cap" and {_level} >= 6:
+        return 20
+    if {_type} is "engineer-discount" and {_level} >= 8:
+        return 2
+    if {_type} is "farmer-food" and {_level} >= 10:
+        return 4
+    return 0
+
+function ecf_energy_cap(p: player) :: number:
+    return 100 + ecf_upgrade_bonus({_p}, "energy-cap")

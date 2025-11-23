@@ -1,0 +1,51 @@
+options:
+    market-day-length: 10 minutes
+    max-price-multiplier: 2.5
+    min-price-multiplier: 0.4
+    base-price-wood: 6
+    base-price-stone: 8
+    base-price-metal: 12
+    base-price-food: 10
+    base-price-energy: 16
+
+on load:
+    set {ecf::market::day} to 0
+    ecf_reset_prices()
+
+function ecf_reset_prices():
+    set {ecf::market::prices::wood} to {@base-price-wood}
+    set {ecf::market::prices::stone} to {@base-price-stone}
+    set {ecf::market::prices::metal} to {@base-price-metal}
+    set {ecf::market::prices::food} to {@base-price-food}
+    set {ecf::market::prices::energy} to {@base-price-energy}
+    delete {ecf::market::transactions::*}
+
+function ecf_market_value(key: text) :: number:
+    return {ecf::market::prices::%{_key}%}
+
+function ecf_adjust_transactions(key: text, amount: number):
+    add {_amount} to {ecf::market::transactions::%{_key}%}
+
+every {@market-day-length}:
+    add 1 to {ecf::market::day}
+    set {_day} to {ecf::market::day}
+    loop {ecf::market::prices::*}:
+        set {_key} to loop-index
+        set {_base} to {@base-price-%{_key}%}
+        set {_delta} to {ecf::market::transactions::%{_key}%}
+        set {_modifier} to (1 + ({_delta} * 0.05))
+        if {_modifier} > {@max-price-multiplier}:
+            set {_modifier} to {@max-price-multiplier}
+        if {_modifier} < {@min-price-multiplier}:
+            set {_modifier} to {@min-price-multiplier}
+        set {ecf::market::prices::%{_key}%} to floor({_base} * {_modifier})
+        delete {ecf::market::transactions::%{_key}%}
+    broadcast "&f[Market] Day %{_day}% &7| Prices recalculated. Check the marketplace to strategize!"
+
+# Daily interest for credits to reward active colonies
+while true:
+    wait 15 minutes
+    loop all players:
+        set {_id} to uuid of loop-player
+        add 5 to {ecf::player::%{_id}%::credits}
+        send "&a+5 credits passive income" to loop-player

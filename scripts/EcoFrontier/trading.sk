@@ -1,0 +1,76 @@
+options:
+    market-sell-modifier: 0.85
+
+function ecf_price_for(key: text, selling: boolean) :: number:
+    set {_price} to ecf_market_value({_key})
+    if {ecf::event::price-multiplier} is set:
+        multiply {_price} by {ecf::event::price-multiplier}
+    if {_selling} is true:
+        multiply {_price} by {@market-sell-modifier}
+    if {_price} < 1:
+        set {_price} to 1
+    return floor({_price})
+
+command /market:
+    trigger:
+        ecf_open_market_menu(player)
+
+command /trade <player>:
+    trigger:
+        if arg 1 is player:
+            set {ecf::trade::request::%uuid of arg-1%} to uuid of player
+            send "&eTrade request sent to %arg-1%." to player
+            send "&e%player% wants to trade. Type &a/tradeaccept&eto open trading." to arg-1
+        else:
+            send "&cPlayer not found." to player
+
+command /tradeaccept:
+    trigger:
+        set {_from} to {ecf::trade::request::%uuid of player%}
+        if {_from} is not set:
+            send "&cNo pending trade request." to player
+            stop
+        set {_p} to offline player with uuid {_from}
+        if {_p} is online:
+            ecf_open_dual_trade_menu({_p}, player)
+            delete {ecf::trade::request::%uuid of player%}
+        else:
+            send "&cRequester is offline." to player
+
+# Simple transactional purchase/sell helpers
+function ecf_buy(p: player, key: text, amount: number) :: boolean:
+    set {_price} to ecf_price_for({_key}, false) * {_amount}
+    set {_id} to uuid of {_p}
+    if {ecf::player::%{_id}%::credits} < {_price}:
+        send "&cNot enough credits (&f%{ecf::player::%{_id}%::credits}%&c/&f%{_price}%&c)." to {_p}
+        return false
+    remove {_price} from {ecf::player::%{_id}%::credits}
+    if {_key} is "energy":
+        set {_cap} to ecf_energy_cap({_p})
+        add {_amount} to {ecf::player::%{_id}%::energy}
+        if {ecf::player::%{_id}%::energy} > {_cap}:
+            set {ecf::player::%{_id}%::energy} to {_cap}
+    else:
+        add {_amount} to {ecf::player::%{_id}%::res::%{_key}%}
+    ecf_adjust_transactions({_key}, {_amount})
+    send "&aPurchased %{_amount}% %{_key}% for %{_price}% credits." to {_p}
+    return true
+
+function ecf_sell(p: player, key: text, amount: number) :: boolean:
+    set {_priceEach} to ecf_price_for({_key}, true)
+    set {_id} to uuid of {_p}
+    if {_key} is "energy":
+        if {ecf::player::%{_id}%::energy} < {_amount}:
+            send "&cNot enough energy to sell." to {_p}
+            return false
+        remove {_amount} from {ecf::player::%{_id}%::energy}
+    else:
+        if {ecf::player::%{_id}%::res::%{_key}%} < {_amount}:
+            send "&cNot enough %{_key}% to sell." to {_p}
+            return false
+        remove {_amount} from {ecf::player::%{_id}%::res::%{_key}%}
+    set {_total} to floor({_priceEach} * {_amount})
+    add {_total} to {ecf::player::%{_id}%::credits}
+    ecf_adjust_transactions({_key}, -({_amount}))
+    send "&aSold %{_amount}% %{_key}% for %{_total}% credits." to {_p}
+    return true

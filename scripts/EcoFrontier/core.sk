@@ -1,0 +1,63 @@
+options:
+    prefix: &a[EcoFrontier]&7
+    default-energy: 60
+    default-credits: 250
+    default-colony: 0
+    tutorial-steps: 6
+
+on load:
+    broadcast "{@prefix} &fEcoFrontier scripts loaded. Use &a/frontier &fto open the colony menu."
+
+function ecf_reset_player(p: player):
+    set {_id} to uuid of {_p}
+    set {ecf::player::%{_id}%::energy} to {@default-energy}
+    set {ecf::player::%{_id}%::credits} to {@default-credits}
+    set {ecf::player::%{_id}%::colony-level} to {@default-colony}
+    set {ecf::player::%{_id}%::res::wood} to 50
+    set {ecf::player::%{_id}%::res::stone} to 50
+    set {ecf::player::%{_id}%::res::metal} to 25
+    set {ecf::player::%{_id}%::res::food} to 32
+    set {ecf::player::%{_id}%::workstations::miner} to 0
+    set {ecf::player::%{_id}%::workstations::farmer} to 0
+    set {ecf::player::%{_id}%::workstations::engineer} to 0
+    set {ecf::player::%{_id}%::workstations::trader} to 0
+    set {ecf::player::%{_id}%::tutorial-step} to 0
+
+on first join:
+    ecf_reset_player(player)
+    send "{@prefix} &fWelcome to &aEcoFrontier&f! A short tutorial will guide you." to player
+    ecf_start_tutorial(player)
+
+on join:
+    set {_id} to uuid of player
+    if {ecf::player::%{_id}%::energy} is not set:
+        ecf_reset_player(player)
+    wait 20 ticks
+    ecf_open_main_menu(player)
+
+command /frontier:
+    aliases: ef, ecofrontier
+    trigger:
+        ecf_open_main_menu(player)
+
+command /frontierstats:
+    trigger:
+        set {_id} to uuid of player
+        send "{@prefix} &fEnergy: &a%{ecf::player::%{_id}%::energy}%" to player
+        send "{@prefix} &fCredits: &a%{ecf::player::%{_id}%::credits}%" to player
+        send "{@prefix} &fColony Level: &a%{ecf::player::%{_id}%::colony-level}%" to player
+        send "{@prefix} &fResources - Wood:&a%{ecf::player::%{_id}%::res::wood}%, Stone:&a%{ecf::player::%{_id}%::res::stone}%, Metal:&a%{ecf::player::%{_id}%::res::metal}%, Food:&a%{ecf::player::%{_id}%::res::food}%" to player
+
+# Sidebar status every 30s
+while true:
+    wait 30 seconds
+    loop all players:
+        set {_id} to uuid of loop-player
+        set name of sidebar of loop-player to "&aEcoFrontier"
+        set score "&fEnergy: &a%{ecf::player::%{_id}%::energy}%" in sidebar of loop-player to 7
+        set score "&fCredits: &a%{ecf::player::%{_id}%::credits}%" in sidebar of loop-player to 6
+        set score "&fColony Lv: &a%{ecf::player::%{_id}%::colony-level}%" in sidebar of loop-player to 5
+        set score "&fWood: &a%{ecf::player::%{_id}%::res::wood}%" in sidebar of loop-player to 4
+        set score "&fStone: &a%{ecf::player::%{_id}%::res::stone}%" in sidebar of loop-player to 3
+        set score "&fMetal: &a%{ecf::player::%{_id}%::res::metal}%" in sidebar of loop-player to 2
+        set score "&fFood: &a%{ecf::player::%{_id}%::res::food}%" in sidebar of loop-player to 1
