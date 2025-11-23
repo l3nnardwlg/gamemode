@@ -1,0 +1,82 @@
+options:
+    workstation-cost-miner: 120
+    workstation-cost-farmer: 100
+    workstation-cost-engineer: 180
+    workstation-cost-trader: 150
+    workstation-energy-miner: 6
+    workstation-energy-farmer: 4
+    workstation-energy-engineer: 8
+    workstation-energy-trader: 3
+    workstation-output-miner: 6 stone, 3 metal
+    workstation-output-farmer: 8 food, 4 wood
+    workstation-output-engineer: 4 metal, 1 energy
+    workstation-output-trader: 14 credits
+    production-interval: 3 minutes
+
+command /workstation <text>:
+    aliases: ws
+    trigger:
+        set {_id} to uuid of player
+        set {_type} to "%arg-1%"
+        if "%{_type}%" is not "miner" and "%{_type}%" is not "farmer" and "%{_type}%" is not "engineer" and "%{_type}%" is not "trader":
+            send "&cInvalid workstation. Types: miner, farmer, engineer, trader" to player
+            stop
+        set {_cost} to {@workstation-cost-%{_type}%}
+        if {ecf::player::%{_id}%::credits} < {_cost}:
+            send "&cNot enough credits (&f%{ecf::player::%{_id}%::credits}%&c/&f%{_cost}%&c)." to player
+            stop
+        remove {_cost} from {ecf::player::%{_id}%::credits}
+        add 1 to {ecf::player::%{_id}%::workstations::%{_type}%}
+        send "&aPurchased %{_type}% workstation. Production starts soon." to player
+        ecf_open_workstation_menu(player)
+
+function ecf_collect_outputs(p: player, type: text, count: number):
+    set {_id} to uuid of {_p}
+    if {_type} is "miner":
+        add (6 * {_count}) to {ecf::player::%{_id}%::res::stone}
+        add (3 * {_count}) to {ecf::player::%{_id}%::res::metal}
+    if {_type} is "farmer":
+        set {_foodBonus} to ecf_upgrade_bonus({_p}, "farmer-food")
+        add ((8 + {_foodBonus}) * {_count}) to {ecf::player::%{_id}%::res::food}
+        add (4 * {_count}) to {ecf::player::%{_id}%::res::wood}
+    if {_type} is "engineer":
+        add ((4 + ecf_upgrade_bonus({_p}, "engineer-metal")) * {_count}) to {ecf::player::%{_id}%::res::metal}
+        set {_cap} to ecf_energy_cap({_p})
+        add (1 * {_count}) to {ecf::player::%{_id}%::energy}
+        if {ecf::player::%{_id}%::energy} > {_cap}:
+            set {ecf::player::%{_id}%::energy} to {_cap}
+    if {_type} is "trader":
+        add (14 * {_count}) to {ecf::player::%{_id}%::credits}
+
+function ecf_workstation_energy(type: text) :: number:
+    if {_type} is "miner":
+        return {@workstation-energy-miner}
+    if {_type} is "farmer":
+        return {@workstation-energy-farmer}
+    if {_type} is "engineer":
+        return {@workstation-energy-engineer}
+    return {@workstation-energy-trader}
+
+every {@production-interval}:
+    loop all players:
+        set {_id} to uuid of loop-player
+        loop "miner" and "farmer" and "engineer" and "trader":
+            set {_count} to {ecf::player::%{_id}%::workstations::%loop-value%}
+            if {_count} <= 0:
+                next loop
+            set {_energyNeed} to ecf_workstation_energy(loop-value) * {_count}
+            if loop-value is "engineer":
+                remove (ecf_upgrade_bonus(loop-player, "engineer-discount") * {_count}) from {_energyNeed}
+            if {ecf::event::energy-multiplier} is set:
+                multiply {_energyNeed} by {ecf::event::energy-multiplier}
+            if {_energyNeed} < 0:
+                set {_energyNeed} to 0
+            if {ecf::player::%{_id}%::energy} < {_energyNeed}:
+                send "&cProduction halted for %{loop-value}% (need %{_energyNeed}% energy)." to loop-player
+                next loop
+            remove {_energyNeed} from {ecf::player::%{_id}%::energy}
+            set {_bonus} to 1
+            if {ecf::event::resource-bonus} is set:
+                set {_bonus} to {ecf::event::resource-bonus}
+            ecf_collect_outputs(loop-player, loop-value, ceil({_count} * {_bonus}))
+            send "&a%loop-value% produced batch x%{_count}%" to loop-player

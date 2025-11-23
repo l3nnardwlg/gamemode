@@ -1,0 +1,90 @@
+function ecf_open_main_menu(p: player):
+    open virtual chest inventory with size 27 named "&aEcoFrontier" to {_p}
+    format slot 10 of {_p} with diamond pickaxe named "&bWorkstations" with lore "&7Manage miners, farmers," and "&7engineers & traders." to run:
+        ecf_open_workstation_menu({_p})
+    format slot 12 of {_p} with emerald named "&aMarketplace" with lore "&7Buy & sell resources" and "&7at dynamic prices." to run:
+        ecf_open_market_menu({_p})
+    format slot 14 of {_p} with nether star named "&eUpgrades" with lore "&7Increase colony level" and "&7unlock structures." to run:
+        ecf_open_upgrade_menu({_p})
+    format slot 16 of {_p} with book named "&fTutorial" with lore "&7Replay tutorial steps" to run:
+        ecf_start_tutorial({_p})
+    set {_id} to uuid of {_p}
+    set {_energy} to {ecf::player::%{_id}%::energy}
+    set {_credits} to {ecf::player::%{_id}%::credits}
+    set {_colony} to {ecf::player::%{_id}%::colony-level}
+    format slot 4 of {_p} with compass named "&aStatus" with lore "&fEnergy: &a%{_energy}%", "&fCredits: &a%{_credits}%", "&fColony Lv: &a%{_colony}%" and "&7Use menus to grow your frontier." to be unstealable
+
+function ecf_open_workstation_menu(p: player):
+    open virtual chest inventory with size 45 named "&bWorkstations" to {_p}
+    set {_id} to uuid of {_p}
+    loop "miner" and "farmer" and "engineer" and "trader":
+        set {_slot} to 10
+        if loop-value is "farmer":
+            set {_slot} to 12
+        if loop-value is "engineer":
+            set {_slot} to 14
+        if loop-value is "trader":
+            set {_slot} to 16
+        set {_cost} to {@workstation-cost-%loop-value%}
+        set {_own} to {ecf::player::%{_id}%::workstations::%loop-value%}
+        format slot {_slot} of {_p} with crafting table named "&a%loop-value%" with lore "&7Owned: &f%{_own}%", "&7Cost: &f%{_cost}% credits" and "&eClick to purchase." to run:
+            make player execute command "workstation %loop-value%"
+    format slot 22 of {_p} with hopper named "&fProduction interval" with lore "&7Runs every {@production-interval}.", "&7Consume energy, produce goods." and "&7Energy Crisis may increase costs." to be unstealable
+    format slot 31 of {_p} with barrier named "&cBack" to run:
+        ecf_open_main_menu({_p})
+
+function ecf_open_upgrade_menu(p: player):
+    open virtual chest inventory with size 27 named "&eUpgrades" to {_p}
+    set {_id} to uuid of {_p}
+    set {_level} to {ecf::player::%{_id}%::colony-level}
+    set {_cost} to ecf_upgrade_cost({_level})
+    format slot 13 of {_p} with nether star named "&eUpgrade Colony" with lore "&7Current: &fLv %{_level}%", "&7Cost: &f%{_cost}% credits", "&7Unlocks new perks." and "&eClick to upgrade." to run:
+        ecf_upgrade_colony({_p})
+        ecf_open_upgrade_menu({_p})
+    format slot 22 of {_p} with barrier named "&cBack" to run:
+        ecf_open_main_menu({_p})
+
+function ecf_open_market_menu(p: player):
+    open virtual chest inventory with size 54 named "&aMarketplace" to {_p}
+    set {_slot} to 10
+    loop "wood" and "stone" and "metal" and "food" and "energy":
+        set {_price} to ecf_price_for(loop-value, false)
+        set {_sell} to ecf_price_for(loop-value, true)
+        format slot {_slot} of {_p} with emerald named "&aBuy %loop-value%" with lore "&7Price: &f%{_price}% per 8", "&eClick to buy." to run:
+            ecf_buy({_p}, "%loop-value%", 8)
+            ecf_open_market_menu({_p})
+        set {_sellSlot} to {_slot} + 9
+        format slot {_sellSlot} of {_p} with gold nugget named "&6Sell %loop-value%" with lore "&7Sell price: &f%{_sell}% per 8", "&eClick to sell." to run:
+            ecf_sell({_p}, "%loop-value%", 8)
+            ecf_open_market_menu({_p})
+        add 2 to {_slot}
+    format slot 49 of {_p} with barrier named "&cBack" to run:
+        ecf_open_main_menu({_p})
+
+function ecf_transfer(p: player, target: player, key: text, amount: number):
+    set {_id} to uuid of {_p}
+    set {_tid} to uuid of {_target}
+    if {ecf::player::%{_id}%::res::%{_key}%} < {_amount}:
+        send "&cNot enough %{_key}% to transfer." to {_p}
+        stop
+    remove {_amount} from {ecf::player::%{_id}%::res::%{_key}%}
+    add {_amount} to {ecf::player::%{_tid}%::res::%{_key}%}
+    send "&aGave %{_amount}% %{_key}% to %{_target}%" to {_p}
+    send "&a%{_p}% sent %{_amount}% %{_key}%" to {_target}
+
+function ecf_open_dual_trade_menu(a: player, b: player):
+    open virtual chest inventory with size 54 named "&eTrade: %a% <> %b%" to {_a}
+    open virtual chest inventory with size 54 named "&eTrade: %a% <> %b%" to {_b}
+    loop {_a} and {_b}:
+        set {_viewer} to loop-value
+        set {_partner} to {_b}
+        if {_viewer} is {_b}:
+            set {_partner} to {_a}
+        format slot 20 of {_viewer} with chest named "&aSend Wood" with lore "&7Transfer 16 wood to partner." to run:
+            ecf_transfer({_viewer}, {_partner}, "wood", 16)
+        format slot 22 of {_viewer} with iron ingot named "&aSend Metal" with lore "&7Transfer 8 metal." to run:
+            ecf_transfer({_viewer}, {_partner}, "metal", 8)
+        format slot 24 of {_viewer} with bread named "&aSend Food" with lore "&7Transfer 16 food." to run:
+            ecf_transfer({_viewer}, {_partner}, "food", 16)
+        format slot 31 of {_viewer} with barrier named "&cClose" to run:
+            close {_viewer}'s inventory

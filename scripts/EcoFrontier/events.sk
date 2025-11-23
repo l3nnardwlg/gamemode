@@ -1,0 +1,53 @@
+options:
+    event-interval: 18 minutes
+    event-duration: 6 minutes
+
+function ecf_clear_event_modifiers():
+    delete {ecf::event::*}
+
+function ecf_start_event(name: text):
+    ecf_clear_event_modifiers()
+    set {ecf::event::active} to {_name}
+    if {_name} is "Energy Crisis":
+        set {ecf::event::energy-multiplier} to 1.5
+        broadcast "&c[Event] Energy Crisis! All energy costs are higher for a while."
+    if {_name} is "Market Crash":
+        set {ecf::event::price-multiplier} to 0.7
+        broadcast "&6[Event] Market Crash! Prices are temporarily lower, selling yields less."
+    if {_name} is "Resource Boom":
+        set {ecf::event::resource-bonus} to 1.4
+        broadcast "&a[Event] Resource Boom! Workstations yield more output."
+    if {_name} is "Storm":
+        set {ecf::event::storm-damage} to true
+        broadcast "&3[Event] Severe Storms! Random structures may be damaged."
+    wait {@event-duration}
+    broadcast "&7[Event] %{_name}% has ended."
+    ecf_clear_event_modifiers()
+
+every {@event-interval}:
+    set {_roll} to random integer between 1 and 4
+    if {_roll} is 1:
+        ecf_start_event("Energy Crisis")
+    if {_roll} is 2:
+        ecf_start_event("Market Crash")
+    if {_roll} is 3:
+        ecf_start_event("Resource Boom")
+    if {_roll} is 4:
+        ecf_start_event("Storm")
+
+every 2 minutes:
+    if {ecf::event::storm-damage} is true:
+        loop all players:
+            set {_id} to uuid of loop-player
+            set {_total} to {ecf::player::%{_id}%::workstations::miner} + {ecf::player::%{_id}%::workstations::farmer} + {ecf::player::%{_id}%::workstations::engineer} + {ecf::player::%{_id}%::workstations::trader}
+            if {_total} <= 0:
+                next loop
+            set {_chance} to random integer between 1 and 100
+            if {_chance} <= 20:
+                set {_remove} to "miner"
+                if {_chance} <= 10:
+                    set {_remove} to "farmer"
+                if {_chance} <= 5:
+                    set {_remove} to "engineer"
+                remove 1 from {ecf::player::%{_id}%::workstations::%{_remove}%}
+                send "&cStorm damaged a %{_remove}% workstation!" to loop-player
